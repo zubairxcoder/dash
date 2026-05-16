@@ -3,36 +3,63 @@ import api from '../api';
 
 const AuthContext = createContext();
 
+const ADMIN_EMAIL    = 'ahmad@devops.pk';
+const ADMIN_PASSWORD = 'password123';
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // attach token globally (IMPORTANT FIX)
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-
-    if (token) {
-      api.defaults.headers.common.Authorization = `Bearer ${token}`;
-    }
-
-    const fetchUser = async () => {
-      try {
+  const autoLogin = async () => {
+    try {
+      // try existing token first
+      const token = localStorage.getItem('token');
+      if (token) {
+        api.defaults.headers.common.Authorization = `Bearer ${token}`;
         const { data } = await api.get('/auth/me');
         setUser(data);
-      } catch (err) {
-        console.log('Auth check failed:', err.message);
-        localStorage.removeItem('token');
-        setUser(null);
-      } finally {
         setLoading(false);
+        return;
       }
-    };
+    } catch {
+      localStorage.removeItem('token');
+    }
 
-    if (token) {
-      fetchUser();
-    } else {
+    // auto login with admin credentials
+    try {
+      const { data } = await api.post('/auth/login', {
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
+      });
+      localStorage.setItem('token', data.token);
+      api.defaults.headers.common.Authorization = `Bearer ${data.token}`;
+      setUser(data.user);
+    } catch {
+      // if admin doesn't exist yet, register then login
+      try {
+        await api.post('/auth/register', {
+          name: 'Ahmad',
+          email: ADMIN_EMAIL,
+          password: ADMIN_PASSWORD,
+          role: 'admin',
+        });
+        const { data } = await api.post('/auth/login', {
+          email: ADMIN_EMAIL,
+          password: ADMIN_PASSWORD,
+        });
+        localStorage.setItem('token', data.token);
+        api.defaults.headers.common.Authorization = `Bearer ${data.token}`;
+        setUser(data.user);
+      } catch (err) {
+        console.log('Auto login failed:', err.message);
+      }
+    } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    autoLogin();
   }, []);
 
   const login = async (email, password) => {
