@@ -7,21 +7,15 @@ dotenv.config();
 
 const app = express();
 
-// ======================
-// CORS - Allow Vercel frontend
-// ======================
-const allowedOrigins = [
-  process.env.CLIENT_URL,
-  'http://localhost:3000',
-].filter(Boolean);
-
+// CORS
 app.use(cors({
   origin: (origin, callback) => {
-    // allow requests with no origin (like mobile apps, curl)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    // allow any vercel.app subdomain
-    if (/\.vercel\.app$/.test(origin)) return callback(null, true);
+    if (!origin || origin.includes('localhost') || /\.vercel\.app$/.test(origin)) {
+      return callback(null, true);
+    }
+    const allowed = process.env.CLIENT_URL;
+    if (allowed && origin === allowed) return callback(null, true);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -30,9 +24,26 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ======================
-// API Routes
-// ======================
+// DB connection (cached for serverless)
+let isConnected = false;
+const connectDB = async () => {
+  if (isConnected) return;
+  await mongoose.connect(process.env.MONGO_URI);
+  isConnected = true;
+  console.log('✅ MongoDB Connected');
+};
+
+// Middleware to ensure DB is connected on every request
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'DB connection failed' });
+  }
+});
+
+// Routes
 app.use('/api/auth',      require('./routes/auth'));
 app.use('/api/projects',  require('./routes/projects'));
 app.use('/api/tasks',     require('./routes/tasks'));
@@ -42,31 +53,18 @@ app.use('/api/finance',   require('./routes/finance'));
 app.use('/api/activity',  require('./routes/activity'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 
-// Health check
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: '✅ DevOps Dashboard API Running' });
 });
 
-// 404
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route Not Found' });
 });
 
-// ======================
-// MongoDB + Start
-// ======================
-const startServer = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('✅ MongoDB Connected');
-    const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-  } catch (error) {
-    console.error('❌ MongoDB Connection Error:', error.message);
-    process.exit(1);
-  }
-};
-
-startServer();
+// For local dev
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+}
 
 module.exports = app;
