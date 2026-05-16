@@ -1,0 +1,24 @@
+{
+  "name": "devops-ai-dashboard",
+  "version": "1.0.0",
+  "description": "Full-stack MERN Developer Management Dashboard with AI",
+  "scripts": {
+    "install-all": "cd backend && npm install && cd ../frontend && npm install",
+    "seed": "cd backend && npm run seed",
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm start\"",
+    "start-backend": "cd backend && npm start",
+    "start-frontend": "cd frontend && npm start",
+    "build": "cd frontend && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongoose": "^9.6.2",
+    "nodemon": "^3.1.14"
+  }
+}
